@@ -47,6 +47,8 @@ app.post("/signup", async (req: Request, res: Response) => {
         const saltRounds = 10;
         const hashedPassword = await bcrypt.hash(password, saltRounds);
 
+
+        // start the transaction
         await pgClient.query('BEGIN');
         // Insert User Query
         const query = `INSERT INTO users (username, password, email) 
@@ -64,8 +66,12 @@ app.post("/signup", async (req: Request, res: Response) => {
             email: result.rows[0].email,
             created_at: result.rows[0].created_at,
         });
+
+        // commit the transaction if evrything runs successfully
 await pgClient.query('commit');
     } catch (error: any) {
+        // if theres any error then get back to previous state of transaction
+        await pgClient.query('ROLLBACK');
         console.error("Error in /signup route:", error.stack);
 
         if (error.code === "23505") {
@@ -73,6 +79,9 @@ await pgClient.query('commit');
         }
 
         res.status(500).json({ error: "Internal Server Error" });
+    }finally{
+        // end the transaction
+        await pgClient.end();
     }
 });
 
